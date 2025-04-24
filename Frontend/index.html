@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ransomware Scanner with MetaMask Integration</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    input[type="file"] {
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      background: #eee;
+      border-left: 4px solid #007bff;
+    }
+
+    #connectButton {
+      background-color: #FF9900;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      color: white;
+      margin-top: 10px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>🔒 Ransomware Detection with MetaMask</h1>
+
+  <!-- MetaMask Connect Button -->
+  <button id="connectButton">Connect MetaMask</button>
+
+  <form id="uploadForm" style="display:none;">
+    <input type="file" id="fileInput" name="file" required />
+    <br>
+    <button type="submit">Scan File</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
+  <script>
+    const connectButton = document.getElementById("connectButton");
+    const form = document.getElementById("uploadForm");
+    const fileInput = document.getElementById("fileInput");
+    const resultDiv = document.getElementById("result");
+
+    let web3;
+
+    // Check if MetaMask is available
+    if (typeof window.ethereum !== "undefined") {
+      console.log("MetaMask is installed!");
+    } else {
+      alert("Please install MetaMask to use this feature.");
+    }
+
+    // Handle MetaMask connection
+    connectButton.addEventListener("click", async () => {
+      try {
+        // Request account access from MetaMask
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        web3 = new Web3(window.ethereum);
+
+        // Enable the upload form after MetaMask is connected
+        form.style.display = "block";
+        connectButton.style.display = "none";
+
+        const accounts = await web3.eth.getAccounts();
+        resultDiv.innerHTML = `Connected account: ${accounts[0]}`;
+      } catch (err) {
+        console.log("MetaMask connection error: ", err);
+        resultDiv.innerHTML = "Connection to MetaMask failed!";
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      resultDiv.innerHTML = "⏳ Scanning...";
+
+      try {
+        const response = await fetch("http://localhost:5000/scan", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          resultDiv.innerHTML = result.isRansomware
+            ? "⚠️ <strong>Ransomware detected!</strong><br><pre>" + result.details + "</pre>"
+            : "✅ <strong>No ransomware found.</strong><br><pre>" + result.details + "</pre>";
+
+          // Example: Perform an action (like calling a smart contract function) if ransomware is detected
+          if (result.isRansomware) {
+            const accounts = await web3.eth.getAccounts();
+            const contractAddress = "0x4B3f20a45Ee24D3E90aBAc0FBBF8e996Dd3A5E65";
+            const abi = [ /* Your contract ABI here */ ];
+
+            const contract = new web3.eth.Contract(abi, contractAddress);
+            
+            // Call a smart contract method (example)
+            await contract.methods.reportRansomware(result.details).send({ from: accounts[0] });
+            resultDiv.innerHTML += "<br>🚨 Report sent to blockchain!";
+          }
+        } else {
+          resultDiv.innerHTML = "❌ Scan failed: " + result.message;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = "❌ Upload failed: " + err.message;
+      }
+    });
+  </script>
+
+</body>
+</html>
